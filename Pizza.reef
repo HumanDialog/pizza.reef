@@ -1,0 +1,126 @@
+
+class PizzaMenuItem
+    Name:    string
+    Picture: string
+    Price:   currency 
+end class
+
+class Process
+    Title:              string
+    StartDate:          date
+    EndDate:            date
+    Tasks<0..n>:        Task <backNav: Process>
+end class   
+
+class PizzaOrder: Process
+    Customer:           User
+    PizzaItem:          PizzaMenuItem
+    CustomerTask:       Task
+    ClerkTask:          Task
+    PizzaChefTask:      Task
+    DeliveryBoyTask:    Task
+    Receipt:            Receipt
+    Evaluation:         integer
+    IsActive:           integer
+end class
+
+class Receipt
+    PizzaItem:  PizzaMenuItem
+end class
+
+
+
+context PizzaOrder::SelectPizza(u: User): PizzaOrder
+post:
+    self.Customer = u
+    result = self                                        
+ 
+
+
+context PizzaOrder::OrderPizza(pizzaItem: PizzaMenuItem): JsonObject
+pre RIGHT_CUSTOMER_ORDERING_PIZZA:
+    self.Customer = user
+pre PIZZA_NOT_YET_SELECTED:    
+    self.CustomerTask.isNull
+post:
+    self.PizzaItem = pizzaItem
+    self.CustomerTask = self.Tasks.newElement(t | t.Title = pizzaItem.Name + ' for ' + self.Customer.Name
+                                        t.Actor = user)
+
+    self.CustomerTask.Summary = self.Customer.Name + " is waiting for " + pizzaItem.Name + ", OrderNo " + self.Id + " at " +  system.GetSystemDate
+    self.CustomerTask.State = STATE_WAITING_FOR_BAKING_PIZZA
+    
+    app.ActiveCustomerTasks.Tasks.insert(self.CustomerTask) 
+            
+    self.ClerkTask = app.ActiveClerkTasks.Tasks.newElement(t |   t.Title = "Take Order" 
+                                                t.State = STATE_MONITOR_PIZZA_ORDER
+                                                t.Process = self) 
+                                                
+    let chefTaskName: string = "Bake the " + pizzaItem.Name
+    let chefTaskSummary: string = "Process for " + self.Customer.Name + ", OrderNo: " + self.Id 
+    self.PizzaChefTask = app.ActivePizzaChefTasks.Tasks.newElement(t |   t.Title = chefTaskName
+                                                    t.Summary =  chefTaskSummary 
+                                                    t.Process = self 
+                                                    t.State = STATE_WAITING_FOR_BAKING_PIZZA)
+                                                    
+    result = {  message: "Your pizza has been ordered.",
+                pizza:  self.PizzaItem.Name,
+                price:  self.PizzaItem.Price            
+    }                                    
+                                                    
+    
+    
+context PizzaOrder::StartBakingPizza()
+pre PIZZA IS WAITING FOR BAKING:
+    self.PizzaChefTask.State = STATE_WAITING_FOR_BAKING_PIZZA
+post:
+    self.PizzaChefTask.State = STATE_BAKING_PIZZA
+    self.CustomerTask.State = STATE_BAKING_PIZZA
+    
+
+
+context PizzaOrder::EndBakingPizza()
+pre RIGHT_PROCESS:
+    self.PizzaChefTask.State = STATE_BAKING_PIZZA
+post:
+    self.PizzaChefTask.State = STATE_PIZZA_BAKED
+    self.CustomerTask.State = STATE_PIZZA_WAITING_FOR_DELIVERY
+
+    let deliveryTaskName: string = "Deliver the " + self.PizzaItem.Name
+    let deliveryTaskSummary: string = "Purchaser is " + self.Customer.Name + ", Price: " + self.PizzaItem.Price + ", OrderNo: " + self.Id
+    self.DeliveryBoyTask = app.ActiveDeliveryTasks.Tasks.newElement(t |t.Title = deliveryTaskName
+                                         t.Summary = deliveryTaskSummary
+                                         t.Process = self
+                                         t.State = STATE_PIZZA_WAITING_FOR_DELIVERY)    
+    
+
+context PizzaOrder::DeliverPizza()
+pre RIGHT_PROCESS:
+    self.DeliveryBoyTask.State = STATE_PIZZA_WAITING_FOR_DELIVERY
+post:
+    self.CustomerTask.State = STATE_PIZZA_IN_DELIVERY
+    self.DeliveryBoyTask.State = STATE_PIZZA_IN_DELIVERY
+
+
+
+context PizzaOrder::ReceivePayment()
+pre RIGHT_PROCESS:
+    self.DeliveryBoyTask.State = STATE_PIZZA_IN_DELIVERY
+post:
+    self.CustomerTask.State = STATE_PIZZA_PAID
+    self.DeliveryBoyTask.State = STATE_PIZZA_PAID    
+    let r: Receipt = new Receipt
+    r.PizzaItem = self.PizzaItem 
+    self.Receipt = r 
+    -- self.Tasks.forAll(element.TaskList = null)
+    self.IsActive = 0
+    
+
+context PizzaOrder::EatPizza(evaluation: integer)
+pre: RIGHT_CUSTOMER_EVALUATING_PIZZA:
+    self.Customer = user
+post:
+    self.CustomerTask.State = STATE_PIZZA_EVELUATED
+    self.Evaluation = evaluation    
+
+

@@ -1,0 +1,114 @@
+
+class App
+    Lists(0..n):    TaskList
+    ArchivedLists(0..n): TaskList
+    Users<all>:     User
+    AllTags:        string
+    ListIndexPrefix:    string
+    TaskIndexCounter:   integer
+
+    PizzaMenuItems<0..n>:       PizzaMenuItem      
+    ActiveCustomerTasks:        TaskList    
+    ActiveClerkTasks:           TaskList
+    ActivePizzaChefTasks:       TaskList
+    ActiveDeliveryTasks:        TaskList    
+    ActivePizzaOrders<0..n>:    PizzaOrder 
+end class 
+
+context App::OnAfterCreate
+post:
+    self.ListIndexPrefix = 'OCT'
+    let firstList: TaskList in
+    
+    firstList = self.Lists.newElement
+    firstList.Name = "Things to do"
+
+
+constraint App::Lists
+    element.Archived = 0
+
+
+constraint App::ArchivedLists
+    element.Archived = 1
+
+constraint App::ActivePizzaOrders
+    element.IsActive = 1
+
+
+context App::SelectPizza(): PizzaOrder
+pre USER_NOT_SELECTED:
+    user <> null
+post:
+    result = self.ActivePizzaOrders.newElement().SelectPizza(user)
+
+context App::InitSample() :JsonObject
+post:
+	-- Clear previous data
+    self.Lists.removeAll
+    self.Users.removeAll
+    self.PizzaMenuItems.deleteAll
+    self.ActivePizzaOrders.deleteAll
+
+    -- Add some data
+        
+    self.PizzaMenuItems.newElement(e| e.Name = "Margherita" and e.Price = 30.00 and e.Picture = '/img/01-menu.jpg')
+    self.PizzaMenuItems.newElement(e| e.Name = "Funghi" and e.Price = 36.00 and e.Picture = '/img/02-menu.jpg') 
+    self.PizzaMenuItems.newElement(e| e.Name = "Cotto" and e.Price = 39.00 and e.Picture = '/img/03-menu.jpg') 
+    self.PizzaMenuItems.newElement(e| e.Name = "Hawaiano" and e.Price = 42.00 and e.Picture = '/img/04-menu.jpg') 
+    self.PizzaMenuItems.newElement(e| e.Name = "Diavola" and e.Price = 43.00 and e.Picture = '/img/05-menu.jpg') 
+    self.PizzaMenuItems.newElement(e| e.Name = "Pesto" and e.Price = 45.00 and e.Picture = '/img/06-menu.jpg') 
+ 
+    let list: TaskList
+    list = self.Lists.newElement
+    list.Name = "Active Customer Orders" 
+    self.ActiveCustomerTasks = list
+ 
+    list = self.Lists.newElement
+    list.Name = "Active Clerk Tasks"
+    self.ActiveClerkTasks = list
+ 
+    list = self.Lists.newElement
+    list.Name = "Active Pizza Chef Tasks" 
+    self.ActivePizzaChefTasks = list
+    
+    list = self.Lists.newElement
+    list.Name = "Active Delivery Tasks" 
+    self.ActiveDeliveryTasks = list
+
+    --self.ReorderLists    
+
+    
+    -- Add sample users
+    let alice: User = new User in
+    alice.login = "Alice"
+    alice.Name = "Alice"
+    alice.groupid = USER_GROUP_CUSTOMER
+
+    let bob: User = new User in
+    bob.login = "Bob"
+    bob.Name = "Bob"
+    bob.groupid = USER_GROUP_CUSTOMER
+
+    let clerk: User = new User in
+    clerk.login = "Clerk"
+    clerk.Name = "Clerk"
+    clerk.groupid = USER_GROUP_CLERK
+
+    let chef: User = new User in
+    chef.login = "Chef"
+    chef.Name = "Chef"
+    chef.groupid = USER_GROUP_CHEF
+
+    let courier: User = new User in
+    courier.login = "Courier"
+    courier.Name = "Courier"
+    courier.groupid = USER_GROUP_DELIVERY
+
+    
+    result = {  message: "Sample Data Prepared",
+                code: 200,
+                listsNo: self.Lists.count,
+                usersNo: self.Users.count
+    }
+    
+    

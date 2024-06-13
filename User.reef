@@ -1,0 +1,44 @@
+const MIN_USER_TASK_ORDER = -2147483648
+const LAST_USER_TASK_ORDER = 2147483648 --2^31
+
+const USER_GROUP_CUSTOMER   = 0
+const USER_GROUP_CLERK      = 1
+const USER_GROUP_CHEF       = 2
+const USER_GROUP_DELIVERY   = 4
+
+
+class User
+    login   :string
+	groupid :integer
+    Name    :string
+    Email   :string
+    MyTasks[0..n] :Task <backNav: Actor(0..1)>
+end class
+       
+constraint User::MyTasks
+    element.ActorId = self.Id and element.Status = STATUS_ACTIVE
+
+context User::FinishTasks()
+post:
+    self.MyTasks.select(element.State <> STATE_FINISHED).forAll(element.Finish())
+
+
+context User::ReorderTasks
+post:
+    let order: integer = MIN_USER_TASK_ORDER in
+    self.MyTasks.orderedBy('UserOrder').forAll(element.UserOrder = order and order = order + 1)
+    order = LAST_USER_TASK_ORDER
+    self.MyTasks.orderedBy('UserOrder').revForAll(element.UserOrder = order and order = order - ORDER_STEP) 
+    
+context User::GetView() :string
+post:
+    select case self.groupid
+        case USER_GROUP_CUSTOMER
+            result = '/menu'
+        case USER_GROUP_CLERK
+            result = '/dashboard'
+        case USER_GROUP_CHEF
+            result = '/kitchen'
+        case USER_GROUP_DELIVERY
+            result = '/delivery'
+    end select

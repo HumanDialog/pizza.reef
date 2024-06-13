@@ -1,0 +1,8 @@
+.reef/
+# bin/
+
+build_output.txt
+!.reef/app_id
+!*.refi
+*.refd
+*.refr
